@@ -5,7 +5,7 @@
 
 
 
-// here are held the input key, shuffling state and output key
+// here are kept the 256 bitinput key, shuffling state and output key
 unsigned int hpipe[] = {0, 0, 0, 0, 0, 0, 0, 0} ;
 
 
@@ -36,20 +36,21 @@ int load_biglist(char *fileName) {
     FILE *fp;
     fp = fopen(fileName, "r");
     if (fp == NULL) return 0;
-    unsigned int numb = fread(impacts, sizeof(impacts), 1, fp);
+    unsigned int numb = fread(impacts, sizeof(unsigned int), numk, fp);
     fclose(fp);
     reset_impacts();
     return numb;
 }
 
 // Shows how much of the biglist was changed.
+unsigned int numimpacts = 0;
 float zero_impacts() {
 	unsigned int i;
-    unsigned int r = 0;
+    numimpacts = 0;
 	for (i = 0; i < numk; i++) {
-        r += (impacts[i] == biglist[i]); 
+        numimpacts += (impacts[i] != biglist[i]); 
 	}
-	return (float) r / (float) numk;
+	return (float) numimpacts / (float) numk;
 }
 
 void show_keys(char *label) {
@@ -86,7 +87,7 @@ unsigned int  seekSpeed(unsigned int numsteps) {
     return biglist[pos];
 }
 
-int LOOPS = 1;
+int LOOPS = 0;
 
 void main (int argc, char* argv[]) {
     unsigned int loopsize;
@@ -99,10 +100,10 @@ void main (int argc, char* argv[]) {
 
     if (MEMHASHSIZE != NULL) {
         sscanf(MEMHASHSIZE, "%d", &numk);
-        if (LOOPS == 1)   
+        if (LOOPS )   
             printf( "MEMHASHSIZE = %s\n", MEMHASHSIZE);
     } else 
-        if (LOOPS == 1) 
+        if (!LOOPS) 
             printf ("MEMHASHSIZE undeclared in environment\n");
 
     biglist = malloc(numk * sizeof(unsigned int));
@@ -112,7 +113,7 @@ void main (int argc, char* argv[]) {
 
     set_key(argv[2]);
 
-    if (LOOPS == 1)
+    if (!LOOPS)
         printf("size of biglist is %d bytes, running %d cycles \n\n",  
                 numk * 4, loopsize
                );
@@ -125,7 +126,7 @@ void main (int argc, char* argv[]) {
                 MEMHASHFILE);
     }
 
-    if (LOOPS > 1) {
+    if (LOOPS) {
         int i;
         for (i = 0; i < LOOPS; i++) {
             shuffle(loopsize);
@@ -134,18 +135,21 @@ void main (int argc, char* argv[]) {
             hpipe[4], hpipe[5], hpipe[6], hpipe[7]);
         }
     } else {
-        show_keys("start:");
+        show_keys("input :");
 
         clock_t stime = clock();
-
+        // shuffling is the "workhorse" KDF
         shuffle(loopsize);
-        // printf ("calculating seek speed %d\n", seekSpeed(loopsize));
         stime = clock() - stime;
-        printf("Done in %4.3f sec, unchanged in biglist is %2.5f %%\n", ((float) stime / CLOCKS_PER_SEC), zero_impacts() * 100.0);
-        show_keys("result:");
+        printf("Done in %4.5f sec, changed in biglist is %2.5f %%", 
+                ((float) stime / CLOCKS_PER_SEC), 
+                zero_impacts() * 100.0 );
+        printf(" (%d multi hits)\n", loopsize - numimpacts);
 
-        // Just do randomised reads from bignum array without writing
+        show_keys("output:");
+
         stime = clock();
+        // Just do randomised reads from bignum array without writing
         unsigned int ss = seekSpeed(loopsize);
         stime = clock() - stime;
         printf("Random lookup time: %4.3f sec  -- %d\n",((float) stime / CLOCKS_PER_SEC), ss);
